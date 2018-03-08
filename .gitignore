@@ -1,10 +1,8 @@
-
-# Ignore files in some directory
+# Ignore files inside, but show these directory
 Data/*
 ANA_out/*
 Plot_out/*
 
-# I want the diretory be shown(but empty inside)
 !Data
 !ANA_out
 !Plot_out
