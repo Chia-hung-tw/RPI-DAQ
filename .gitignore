@@ -1,0 +1,6 @@
+
+# Ignore files in some directory
+Data/*
+yaml/*
+ANA_out/*
+Plot_out/*

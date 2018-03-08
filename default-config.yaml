@@ -1,0 +1,21 @@
+---
+daq_options:
+ compressRawData: yes
+ nEvent: 1000
+ externalChargeInjection: yes
+ acquisitionType: sweep
+ channelIds: []
+ channelIdsToMask: []
+ channelIdsDisableTOT: []
+ channelIdsDisableTOA: []
+ injectionDAC: 2000
+ pulseDelay: 80
+glb_options:
+ moduleNumber: 1
+ outputRawDataPath: Data
+ outputYamlPath: yaml
+ storeYamlFile: yes
+ startServerManually: no
+ serverIpAdress: 194.12.171.221
+ serverCodePath: /home/pi/arnaud-dev/rpi-daq
+...
