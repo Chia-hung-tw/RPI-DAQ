@@ -1,8 +1,0 @@
-# Ignore files inside, but show these directory
-Data/*
-ANA_out/*
-Plot_out/*
-
-!Data
-!ANA_out
-!Plot_out
