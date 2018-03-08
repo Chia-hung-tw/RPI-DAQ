@@ -386,26 +386,22 @@ else{
 	
     /*	optional save raw data */
 	//modified by RSLU 23.11.2017
-	strcpy(fname, dirname);
-	strcat(fname, "Module_");
-	strcat(fname, moduleNumber);
-	strcat(fname, "_");
-	strcat(fname, buffer);
-	strcat(fname,".raw");
-	printf("Filename will be %s\n",fname);
-
-	//strcpy(fname, dirname);
-	//strcat(fname, buffer);
-	//strcat(fname,".raw.txt");
-	//printf("Raw filename will be %s\n",fname);
-
 	if(saveraw){
-	          //Also open a log file here
-	  	  flog = fopen("runinfo.log","w");
-		  fprintf(flog,fname);
-		  fclose (flog);
-		  fraw = fopen(fname, "w");
-		  //Open a pulse txt if inject mode is selected
+	
+	  strcpy(fname, dirname);
+	  strcat(fname, "Module_");
+	  strcat(fname, moduleNumber);
+	  strcat(fname, "_");
+	  strcat(fname, buffer);
+	  strcat(fname,".raw");
+	  printf("Raw filename will be %s\n",fname);
+	  
+	  //Also open a log file here
+	  flog = fopen("runinfo.log","w");
+	  fprintf(flog,fname);
+	  fclose (flog);
+	  fraw = fopen(fname, "w");
+	  //Open a pulse txt if inject mode is selected
 		  if(pulse_inj[0] == 'Y' | pulse_inj[0] == 'y'){
 		    strcpy(fname, dirname);
 		    strcat(fname, "Module_");
@@ -420,7 +416,8 @@ else{
 		    printf("Injection information will be stored: %s\n",fname);
 		  }		
 	}
-	
+	else{
+	  printf("Raw file will not be saved! So as injection file.");	}
 /*  Initialize RPI */
 	if (!bcm2835_init())
         return 1;
@@ -483,25 +480,25 @@ else{
 /*                  do the work                     */
 /*****************************************************/
     printf("\nStart events acquisition\n");
-    //c_ctrl = 50;
-    //dac_ctrl = 2047;
+
     for(i = 0; i < maxevents; i = i +1){
 		if(pulse_sweep[0] == 'Y' | pulse_sweep[0] == 'y'){
-		  //  dac_ctrl+=50;
-		  //dac_ctrl = dac_ctrl + dac_fs/maxevents;
-		  dac_ctrl = dac_ctrl + 10;
+		  
+		        dac_ctrl = dac_ctrl + dac_fs/maxevents;
 			res = set_dac_high_word((dac_ctrl & 0xFF0)>>4);
 			res = set_dac_low_word(dac_ctrl & 0x00F);
 			//record injection information here
+			if(saveraw){
 			fprintf(finject,"%d\t",i);
-			fprintf(finject,"%d\n",dac_ctrl);
+			fprintf(finject,"%d\n",dac_ctrl);}
 		}
 		else{
 		    res = set_dac_high_word(DAC_HIGH_WORD);
 		    res = set_dac_low_word(DAC_LOW_WORD);
 		    //record injection information here
+		    if(saveraw){
 		    fprintf(finject,"%d\t",i);
-		    fprintf(finject,"%d\n",-1);
+		    fprintf(finject,"%d\n",-1);}
 		}
         res = send_command(CMD_RESETPULSE);
     	usleep(delay1);
@@ -517,27 +514,7 @@ else{
 			if(pulse_inj[0] == 'N' | pulse_inj[0] == 'n') 
 				res = send_command(CMD_SETSTARTACQ);  /* <<<+++   THIS IS THE TRIGGER */
 			else	{
-			  /*
-			  printf("\n\npause for 10s,generate 5 calib pulse.\n");
-			  usleep(10000000);
-			  printf("1\n");
-			  calib_gen();
-			  usleep(1000000);
-			  printf("2\n");
-			  calib_gen();
-			  usleep(1000000);
-			  printf("3\n");
-			  calib_gen();
-			  usleep(1000000);
-			  printf("4\n");
-			  calib_gen();
-			  usleep(1000000);
-			  printf("5\n");
-			  */
-			  //usleep(1000000);
-			  calib_gen();
-			  //usleep(1000000);
-			}
+			  calib_gen();			}
 		}
 	res = send_command(CMD_STARTCONPUL);
     	usleep(delay3);
@@ -591,9 +568,9 @@ else{
 		usleep(delay5);
 		}
 		fclose(fout);
-		if(saveraw)
-			fclose(fraw);
-		if(pulse_inj[0] == 'Y' | pulse_inj[0] == 'y')
-		        fclose(finject);
+		if(saveraw){
+		  fclose(fraw);
+		  if(pulse_inj[0] == 'Y' | pulse_inj[0] == 'y')
+		    fclose(finject);}
 		return(0);     
 	}
