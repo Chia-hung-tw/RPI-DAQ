@@ -1,7 +1,7 @@
 ---
 daq_options:
  compressRawData: yes
- nEvent: 1000
+ nEvent: 410
  externalChargeInjection: yes
  acquisitionType: sweep
  channelIds: []
