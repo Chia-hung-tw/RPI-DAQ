@@ -92,9 +92,16 @@ if __name__ == "__main__":
     outputFile.write(byteArray)
 
     data_unpacker=unpacker.unpacker(daq_options['compressRawData'])
+    #start_dac = raw_input("Start of the dac value: ")
+    #spacing_dac = raw_input("Spacing of the dac value: ")
+    
     for event in range(daq_options['nEvent']):
-        rawdata=theDaq.processEvent()
-        data_unpacker.unpack(rawdata)
+        #dac = int(start_dac) + int(spacing_dac) * event
+        dac = 0
+        if dac > 4095:
+            dac = 4095
+        rawdata=theDaq.processEvent(dac)
+        #data_unpacker.unpack(rawdata)
         #data_unpacker.showData(event)
     
         byteArray = bytearray(rawdata)

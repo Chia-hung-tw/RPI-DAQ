@@ -89,14 +89,15 @@ class rpi_daq:
 
     ##########################################################
 
-    def processEvent(self):
+    def processEvent(self,dac_value):
         print("Start events acquisition")
         dac_ctrl=0
         dac_fs=0xFFF
         if self.daq_options['acquisitionType']=="sweep":
-            stop_till_input = raw_input(">>> Stop till Input: ")
+            #stop_till_input = raw_input(">>> Stop till Input: ")
+            #dac_ctrl = dac_value
             dac_ctrl = int(dac_fs * float(self.eventID) / float(self.daq_options['nEvent']))
-            print(dac_fs , " , " , self.eventID , " , " , self.daq_options['nEvent'])
+            #print(dac_fs , " , " , self.eventID , " , " , self.daq_options['nEvent'])
             print("dac_ctrl = %d" % dac_ctrl)
             res = self.gpio.set_dac_high_word((dac_ctrl & 0xFF0)>>4)
             print("dac_high_word = %d" % ((dac_ctrl & 0xFF0)>>4))
