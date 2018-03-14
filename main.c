@@ -63,7 +63,8 @@ static unsigned char BusMode;         // global to remember status of gpio lines
 #define CMDH_LOOPBACK    0x1F
 #define DAC_HIGH_WORD    0x42
 #define DAC_LOW_WORD     0x0A
-#define TRIGGER_DELAY    0x15// 0x00 to 0x07
+#define TRIGGER_DELAY    0x07// 0x00 to 0x07
+#define PULSE_DELAY      0x50// min 30 to max 127 (30 means 0x1e)
 
 /* // ****** OLD STRINGS **** DO NOT USE
 // Calibration String enabling Test Pulse on Ch. 2
@@ -430,7 +431,10 @@ else{
     for(i=0; i < 33000; i = i+1){
     	res = read_local_fifo();	
     }
-   	res = set_trigger_delay(TRIGGER_DELAY);
+    if(pulse_inj[0] == 'Y' | pulse_inj[0] == 'y')
+      res = set_trigger_delay(PULSE_DELAY);   
+    else
+      res = set_trigger_delay(TRIGGER_DELAY);
    	
 /*****************************************************/
 /*             set configuration                     */

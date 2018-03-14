@@ -410,7 +410,7 @@ void dump_gnuplotconfig(string fileN){
 
 void Inj_ana(){
   int N_inj  = 1;
-  int tar_CH = 30;
+  int tar_CH = 36;
   int tar_TS = 4;
   
   string logcontent;
