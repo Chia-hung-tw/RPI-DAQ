@@ -1,5 +1,15 @@
-echo "./take_pedestal"
-./take_pedestal
+echo ""
+echo "This script take a pedestal run and show the avg result of each channel..."
+echo ""
+
+cmd="python run.py --compressRawData --moduleNumber=1 --acquisitionType=standard --nEvent=500 --acquisitionType=standard"
+echo $cmd
+$cmd
+
+echo ""
+make
+echo ""
+
 echo "./decode_ana"
 ./decode_ana
 echo "gnuplot gnuplot/plot_ped_check.gp"

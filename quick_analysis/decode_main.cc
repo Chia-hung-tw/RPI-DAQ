@@ -4,6 +4,7 @@
 #include <fstream>
 #include <math.h>
 #include <iomanip>
+#include <vector>
 #include "CHMapping.h"
 
 //================================= Options ===================================
@@ -22,19 +23,27 @@ const int  SCAtodraw = 0;
 using namespace std;
 
 unsigned char raw[RAWSIZE];
+unsigned char config[48];
 unsigned int ev[4][1924];
 int dati[4][128][totSCA];
 int dati_sum[4][128][nSCA];
 double dati_sumsq[4][128][nSCA];
 int mem_counter[4][128][nSCA];
+
 int evt_counter;
+int dac = 0;
+int rollpos;
+vector<int> insert_ch;
+
 
 float avg_HG  [4][64][nSCA];
 float sigma_HG[4][64][nSCA];
 float avg_LG  [4][64][nSCA];
 float sigma_LG[4][64][nSCA];
 
-int decode_raw();
+
+int raw_type(const char* filename);
+int decode_raw(int rawtype);
 int format_channels();
 int roll_position(); //Output is the location of TS 0
 int init(); // initialize the sum and sumsq array
@@ -46,7 +55,7 @@ void dump_HGxynoise_avg(); // for plotting
 void dump_LGxynoise_avg(); // for plotting
 void dump_ped_check();     // dump HG pedestal for plotting
 void dump_gnuplotconfig(string fileN); // tell gnuplot which file is the input
-void Inj_ana();
+void read_inj_config(); //Read charge injection config
 
 int main(){
 
@@ -57,92 +66,240 @@ int main(){
   logfile >> logcontent;
   char fileName[100];
   sprintf(fileName,"%s",logcontent.c_str());
+
+  //Do a little prevention
+  int end = logcontent.find(".raw");
+  if( end < 2 ){
+      cout << endl;
+      cout << "please only feed .raw data!\n" << fileName << " is not legal!\n";
+      cout << endl;
+      exit(0);} 
+  
   ifstream file(fileName);
   cout << "input file: " << fileName << endl;
-  if (file.is_open()){
-    init();
-    while(true){
-      if(evt_counter % 100 == 0)
-	cout << "processing event " << evt_counter << "..." << endl;
-      unsigned char testeof;
-      file >> testeof;
-      if( file.eof() ) break;
-      else{
-	testeof = raw[0];
-	for(int i = 1 ; i < RAWSIZE; ++i)
-	  file >> raw[i];
-	decode_raw();
-	format_channels();
-	int rollpos = roll_position();
-	//Sum and Sum square calculator (use to calculate RMS and sigma)
-	channel_sum(rollpos);
-	evt_counter++;
+
+  int rawT = raw_type(fileName);
+  if(rawT == 3) exit(0);
+  
+  ifstream fileinj;
+  if(rawT == 0){
+    // Check if injection file exist
+    char fileinj_t[150];
+    
+    string purefname = logcontent.substr(0,end);
+    sprintf(fileinj_t,"%s_Inj.txt",purefname.c_str());
+    fileinj.open( fileinj_t );
+    if( !fileinj.is_open() ){
+      cout << "Did not find injection file " << fileinj_t
+	     << ".\n Take this run as pedestal.(Inj_dac = 0)" << endl;
+      dac = 0;}
+    else{
+      cout << "injection file: " << fileinj_t << endl;
+      string dum_line;
+      for(int i = 0 ; i < 5; ++i) {
+	if(i == 1) {
+	  int tmp_CH;
+	  fileinj >> tmp_CH;
+	  insert_ch.push_back(tmp_CH);}
+	getline(fileinj,dum_line);//remove header
       }
     }
   }
-  file.close();
-  cout << "Evt = " << evt_counter << endl;
-  ped_and_noise();
-  dump_PandN(fileName);
 
-  //plotting stuff
-  //dump_frame();
-  if(HGorLGtodraw == 0)
-    dump_HGxynoise_avg();
-  else if(HGorLGtodraw == 1)
-    dump_LGxynoise_avg();
-  else{
-    dump_HGxynoise_avg();
-    dump_LGxynoise_avg();}
-  dump_gnuplotconfig(fileName);
-  dump_ped_check();
-  Inj_ana();
-}
-
-int decode_raw(){
-    int i, j, k, m;
-    unsigned char x;
-	unsigned int t;
-	unsigned int bith, bit11, bit10, bit9, bit8, bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0;
-	for( i = 0; i < 1924; i = i+1){
-		for (k = 0; k < 4; k = k + 1){
-			ev[k][i] = 0;
-		}
-   	}
-    for( i = 0; i < 1924; i = i+1){
-        for (j=0; j < 16; j = j+1){
-            x = raw[1 + i*16 + j];
-            x = x & 15;
-            for (k = 0; k < 4; k = k + 1){
-            	ev[k][i] = ev[k][i] | (unsigned int) (((x >> (3 - k) ) & 1) << (15 - j));
-            }
-        }
+  if (file.is_open()){
+    int evtsize;
+    switch(rawT){
+    case 0: evtsize = 30787; break;
+    case 1: evtsize = 30786; break;
+    case 2: evtsize = 15394; break;
+    default:evtsize = 30787; break;
+    }
+    //Remove chip config
+    if(rawT == 1 || rawT == 2){
+      uint8_t header[48];
+      file.read( reinterpret_cast<char*>(header), 48 );
+      for(int i = 0 ; i < 48 ; ++i)
+	config[i]   = header[i];
+      read_inj_config(); 
     }
     
+    init();
+
+    //Loop event till the end of run
+    while(true){
+      if(evt_counter % 100 == 0)
+	cout << "processing event " << evt_counter << "..." << endl;
+      uint8_t testeof[2] = {0,0};
+      file.read( reinterpret_cast<char*>(testeof), 2 );
+      if( file.eof() ) break;
+      else{
+	raw[0] = testeof[0];
+	raw[1] = testeof[1];
+	if(rawT != 0){
+	  uint8_t x[2] = {0,0};
+	  for(int i = 1 ; i < evtsize/2; ++i){
+	    file.read( reinterpret_cast<char*>(x), 2 );
+	    raw[2*i]   = x[0];
+	    raw[2*i+1] = x[1];	  }}
+	else{
+	  for(int i = 2; i < evtsize; ++i)
+	    file >> raw[i];}
+	decode_raw(rawT);
+	format_channels();
+	rollpos = roll_position();
+	int ev_dum;
+	if( rawT == 0 && fileinj.is_open() ){
+	  fileinj >> ev_dum >> dac;}
+	if( rawT == 1 || rawT == 2){
+	  
+	  if( (int)raw[evtsize-2] == 0xab && (int) raw[evtsize-1] == 0xcd){
+	    //This is a magic number for no charge injection
+	    dac = 0;}
+	  else{
+	    dac = (unsigned int)((raw[evtsize-1] << 8) | raw[evtsize-2]);
+	    //cout << "evt = " << evt_counter <<  ", dac = " << dac << endl;
+	  }
+	} 	
+	evt_counter++;
+      }
+    }
+    file.close();
+    cout << "Evt = " << evt_counter << endl;
+    ped_and_noise();
+    dump_PandN(fileName);
+
+    //plotting stuff
+    //dump_frame();
+    if(HGorLGtodraw == 0)
+      dump_HGxynoise_avg();
+    else if(HGorLGtodraw == 1)
+    dump_LGxynoise_avg();
+    else{
+      dump_HGxynoise_avg();
+      dump_LGxynoise_avg();}
+    dump_gnuplotconfig(fileName);
+    dump_ped_check();
+  }
+}
+
+int raw_type(const char* filename){
+  ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
+  if((int)in.tellg() % 30787 == 0){
+    cout << "data format of " << filename << ": old" << endl;
+      return 0;}
+  if( ((int)in.tellg()-48) % 30786 == 0){
+    cout << "data format of " << filename << ": new" << endl;
+    return 1;}
+  if( ((int)in.tellg()-48) % 15394 == 0){
+    cout << "data format of " << filename << ": new compressed" << endl;
+    return 2;}
+  else{ cout << "unrecognized data size! Rawdata may not be saved correctedly!"
+	     << endl;
+    return 3;}
+}
+
+void read_inj_config(){
+
+  insert_ch.clear();
+  
+  unsigned char lowB,highB;
+  int bitC = 0;
+  int guess_CH = 0;
+  bool ch_flag = false;
+  for(int Q = 0; Q < 48 ; ++Q){
+    lowB  = config[Q];
+    highB = (lowB >> 4) & 0xf;
+    lowB  = lowB & 0xf;
+    for(int bit = 0; bit < 8 ; ++bit){
+      int a;
+      if( bit < 4 ){
+	a = ( highB >> ( 3 - bit )) & 1;}
+      else{
+	a = ( lowB >> ( 7 - bit )) & 1;}
+      if(ch_flag && guess_CH < 64) {
+	if(a == 1){
+	  cout << "Inj_CH = " << ( 63 - guess_CH ) << ", ";
+	  insert_ch.push_back( 63 - guess_CH );
+	      }
+	guess_CH++;	      
+      }
+      bitC++;
+      if(bitC == 83 || bitC == 147){
+	ch_flag = true;}
+      else
+	ch_flag = false;
+    }
+  }
+  cout << endl;
+  if((int) insert_ch.size() == 0){
+    cout << "Find no insertion CH -> take this run pedestal run!" << endl;
+  }
+  
+}
+
+int decode_raw(int rawtype){
+    int i, j, k;
+    unsigned char x,y;
+    unsigned int t;
+    unsigned int bith, bit11, bit10, bit9, bit8, bit7, bit6, bit5, bit4, bit3, bit2, bit1, bit0;
+    for( i = 0; i < 1924; i = i+1){
+      for (k = 0; k < 4; k = k + 1){
+	ev[k][i] = 0;
+      }
+    }
+    if(rawtype == 0 || rawtype == 1){
+      int offset;
+      if( rawtype == 0 ) offset = 1;
+      else offset = 0;
+      for( i = 0; i < 1924; i = i+1){
+        for (j=0; j < 16; j = j+1){
+	  x = raw[offset + i*16 + j];
+	  x = x & 15;
+	  for (k = 0; k < 4; k = k + 1){
+	    ev[k][i] = ev[k][i] | (unsigned int) (((x >> (3 - k) ) & 1) << (15 - j));
+	  }
+        }
+      }
+    }
+    if(rawtype == 2){
+      for( i = 0; i < 1924; i = i+1){
+        for (j=0; j < 8; j = j+1){
+	  x = raw[i*8 + j];
+	  y = (x >> 4) & 0xf;
+	  x = x & 0xf;
+	  for (k = 0; k < 4; k = k + 1){
+	    ev[k][i] = ev[k][i] | (((x >> (3 - k) ) & 1) << (14 - j*2));
+	    ev[k][i] = ev[k][i] | (((y >> (3 - k) ) & 1) << (15 - j*2));}
+	}
+      }
+    }
     /*****************************************************/
     /*    Gray to binary conversion                      */
     /*****************************************************/
    	for(k = 0; k < 4 ; k = k +1 ){
    		for(i = 0; i < 128*totSCA; i = i + 1){
-   			bith = ev[k][i] & 0x8000;
-   			t = ev[k][i] & 0x7fff;
-   			bit11 = (t >> 11) & 1;
-        	bit10 = bit11 ^ ((t >>10) &1);
-        	bit9 = bit10 ^ ((t >>9) &1);
-        	bit8 = bit9 ^ ((t >>8) &1);
-        	bit7 = bit8 ^ ((t >>7) &1);
-        	bit6 = bit7 ^ ((t >>6) &1);
-        	bit5 = bit6 ^ ((t >>5) &1);
-        	bit4 = bit5 ^ ((t >>4) &1);
-        	bit3 = bit4 ^ ((t >>3) &1);
-        	bit2 = bit3 ^ ((t >>2) &1);
-        	bit1 = bit2 ^ ((t >>1) &1);
-        	bit0 = bit1 ^ ((t >>0) &1);
-        	ev[k][i] =  bith | ((bit11 << 11) + (bit10 << 10) + (bit9 << 9) + (bit8 << 8) + (bit7 << 7) + (bit6 << 6) + (bit5 << 5) + (bit4 << 4) + (bit3  << 3) + (bit2 << 2) + (bit1  << 1) + bit0);
-        }
-    }
+		 
+		  bith = ev[k][i] & 0x8000;
+		  t = ev[k][i] & 0x7fff;
+		  bit11 = (t >> 11) & 1;
+		  bit10 = bit11 ^ ((t >>10) &1);
+		  bit9 = bit10 ^ ((t >>9) &1);
+		  bit8 = bit9 ^ ((t >>8) &1);
+		  bit7 = bit8 ^ ((t >>7) &1);
+		  bit6 = bit7 ^ ((t >>6) &1);
+		  bit5 = bit6 ^ ((t >>5) &1);
+		  bit4 = bit5 ^ ((t >>4) &1);
+		  bit3 = bit4 ^ ((t >>3) &1);
+		  bit2 = bit3 ^ ((t >>2) &1);
+		  bit1 = bit2 ^ ((t >>1) &1);
+		  bit0 = bit1 ^ ((t >>0) &1);
+		  ev[k][i] =  bith | ((bit11 << 11) + (bit10 << 10) + (bit9 << 9) + (bit8 << 8) + (bit7 << 7) + (bit6 << 6) + (bit5 << 5) + (bit4 << 4) + (bit3  << 3) + (bit2 << 2) + (bit1  << 1) + bit0);
+		}
+	}
+	return(0);	
 }
 
+ 
 int format_channels(){
     int chip, hit, ch;
 	
@@ -156,6 +313,8 @@ int format_channels(){
     return(0);
 }
 
+
+ 
 int roll_position(){
   unsigned int roll_check;  //Just to check if 4 chip has same rollmask
   int chip,first,sec,rollpos;
@@ -408,90 +567,3 @@ void dump_gnuplotconfig(string fileN){
   file.close();
 }
 
-void Inj_ana(){
-  int N_inj  = 1;
-  int tar_CH = 30;
-  int tar_TS = 4;
-  
-  string logcontent;
-  ifstream logfile("./runinfo.log");
-  logfile >> logcontent;
-  char fileName[100];
-  sprintf(fileName,"%s",logcontent.c_str());
-  ifstream file(fileName);
-
-  //Find inj.txt
-  int end = logcontent.find(".raw");
-  string fn = logcontent.substr(0,end);
-  sprintf(fileName,"%s_Inj.txt",fn.c_str());
-  ifstream file_inj(fileName);
-  if(!file_inj.is_open()){
-    cout << "Can't find file " << fileName << ", exit Injection analysis!"
-	 << "\n This run may not be an injection run!" << endl;
-    return;}
-  string dum_line;
-  for(int i = 0 ; i < 5; ++i) {
-    if(i == 1) file_inj >> tar_CH;
-    getline(file_inj,dum_line);    
-  }
-  ofstream fout("gnuplot/dac_adc.dat");
-  fout << "#evt\tdac\t";
-  for(int i = 0 ; i < 4 ; ++i){
-    fout << "c" << i << ",C" << tar_CH << "HG\t";
-    fout << "c" << i << ",C" << tar_CH << "LG\t";}
-  fout << "\n";
-
-  cout << "dumping CH " << tar_CH << " TS " << tar_TS << " for all 4 chips to "
-       << "gnuplot/dac_adc.dat ...." << endl;
-  int chip,ch,hit;
-  
-  if (file.is_open()){
-    while(true){
-      unsigned char testeof;
-      file >> testeof;
-      if( file.eof() ) break;
-      else{
-	testeof = raw[0];
-	for(int i = 1 ; i < RAWSIZE; ++i)
-	  file >> raw[i];
-	decode_raw();
-	format_channels();
-	int rollpos = roll_position();
-	float sig_evt[4][N_inj*2];
-
-	for (chip =0; chip < 4; chip = chip +1 ){
-	  int fake_CH_HG = 127 - tar_CH;
-	  int fake_CH_LG = 63 - tar_CH;
-	  for (hit = 0 ; hit < nSCA ; hit = hit +1){
-	    int ts;
-	    if(hit >= rollpos) ts = hit - rollpos;
-	    else ts = 12+hit-rollpos+1;
-	    if (ts == tar_TS){
-	      sig_evt[chip][0] = dati[chip][fake_CH_HG][hit];
-	      //sig_evt[chip][0] =
-	      //dati[chip][fake_CH_HG][hit] - avg_HG [chip][tar_CH][hit];
-	      sig_evt[chip][1] = dati[chip][fake_CH_LG][hit];
-	      //sig_evt[chip][1] =
-	      //dati[chip][fake_CH_LG][hit] - avg_LG [chip][tar_CH][hit];
-	    }}}
-
-	int nevt,dac;
-	file_inj >> nevt >> dac;
-	fout << nevt << "\t" << dac << "\t";
-	for(int i = 0 ; i < 4 ; ++i){
-	  fout << setprecision(4) << sig_evt[i][0] << "\t"
-	       << sig_evt[i][1] << "\t";
-	}
-	//TOTS
-	for(int i = 0 ; i < 4 ; ++i){
-	  int fake_CH_HG = 127 - tar_CH;
-	  fout << setprecision(4) << dati[i][fake_CH_HG][14] << "\t";}
-	fout << endl;
-      }
-    }
-  }
-  file.close();
-  file_inj.close();
-  fout.close();
-  
-}

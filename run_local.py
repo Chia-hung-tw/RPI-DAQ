@@ -83,6 +83,10 @@ if __name__ == "__main__":
     rawFileName=rawFileName+str(the_time.day)+"-"+str(the_time.month)+"-"+str(the_time.year)+"_"+str(the_time.hour)+"-"+str(the_time.minute)
     rawFileName=rawFileName+".raw"
     print("\t open output file : ",rawFileName)
+    logfile = open("runinfo.log",'w')
+    logfile.write(rawFileName)
+    logfile.close()
+
     outputFile = open(rawFileName,'wb')
 
     theDaq=rpi_daq.rpi_daq(daq_options)
