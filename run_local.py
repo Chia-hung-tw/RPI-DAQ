@@ -23,6 +23,15 @@ def get_comma_separated_args(option, opt, value, parser):
 if __name__ == "__main__":
     
     parser = OptionParser()
+    parser.add_option("-a", "--compressRawData",dest="compressRawData",action="store_true",
+                      help="option to compress (ie remove the '1000' before each word) raw data",default=False)
+    
+    parser.add_option("-b", "--moduleNumber", dest="moduleNumber",type="int",action="store",
+                      help="moduleNumber", default=63)
+    
+    parser.add_option("-c", "--nEvent", dest="nEvent",type="int",
+                      help="number of event",default=100)
+
     parser.add_option("-d", "--externalChargeInjection", dest="externalChargeInjection",action="store_true",
                       help="set to use external injection",default=False)
     parser.add_option("-e", "--acquisitionType", dest="acquisitionType",choices=["standard","sweep","fixed","const_inj"],
@@ -35,12 +44,15 @@ if __name__ == "__main__":
     print(options)
 
     conf=yaml_config()
+    conf.yaml_opt['daq_options']['compressRawData']=options.compressRawData
+    conf.yaml_opt['daq_options']['nEvent']=options.nEvent
     conf.yaml_opt['daq_options']['acquisitionType']=options.acquisitionType
     conf.yaml_opt['daq_options']['externalChargeInjection']=options.externalChargeInjection
     conf.yaml_opt['daq_options']['injectionDAC']=options.injectionDAC
     for i in options.channelIds:
         conf.yaml_opt['daq_options']['channelIds'].append(int(i))
 
+    conf.yaml_opt['glb_options']['moduleNumber'] = options.moduleNumber
     daq_options=conf.yaml_opt['daq_options']
     glb_options=conf.yaml_opt['glb_options']
 

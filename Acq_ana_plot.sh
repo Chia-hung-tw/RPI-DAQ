@@ -74,7 +74,7 @@ else
     echo "which CH(s) are you going to insert charge? Use comma to separate, ex:20,32. Can insert max 8 channels each time."
     echo "Enter CHs below this line: "
     read CHId
-    cmd="python run.py --compressRawData --moduleNumber=1 --nEvent=1000 --externalChargeInjection --acquisitionType=sweep --channelIds=$CHId"
+    cmd="python run_local.py --compressRawData --moduleNumber=1 --nEvent=1000 --externalChargeInjection --acquisitionType=sweep --channelIds=$CHId"
     echo $cmd
     $cmd
     echo "./decode_ana"

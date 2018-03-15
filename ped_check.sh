@@ -2,7 +2,7 @@ echo ""
 echo "This script take a pedestal run and show the avg result of each channel..."
 echo ""
 
-cmd="python run.py --compressRawData --moduleNumber=1 --acquisitionType=standard --nEvent=500 --acquisitionType=standard"
+cmd="python run_local.py --compressRawData --moduleNumber=1 --nEvent=100"
 echo $cmd
 $cmd
 

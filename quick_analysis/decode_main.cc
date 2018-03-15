@@ -147,6 +147,10 @@ int main(){
 	decode_raw(rawT);
 	format_channels();
 	rollpos = roll_position();
+   	//Sum and Sum square calculator (use to calculate RMS and sigma)
+	channel_sum(rollpos);
+
+	//Deal with insert DAC
 	int ev_dum;
 	if( rawT == 0 && fileinj.is_open() ){
 	  fileinj >> ev_dum >> dac;}
@@ -159,7 +163,7 @@ int main(){
 	    dac = (unsigned int)((raw[evtsize-1] << 8) | raw[evtsize-2]);
 	    //cout << "evt = " << evt_counter <<  ", dac = " << dac << endl;
 	  }
-	} 	
+	}
 	evt_counter++;
       }
     }
@@ -224,7 +228,7 @@ void read_inj_config(){
 	guess_CH++;	      
       }
       bitC++;
-      if(bitC == 83 || bitC == 147){
+      if(bitC >= 83 && bitC <= 147){
 	ch_flag = true;}
       else
 	ch_flag = false;
@@ -546,6 +550,8 @@ void dump_ped_check(){
     for(ch = 0; ch < 64; ++ch){      
       file << chip*64+ch << "\t" << avg_HG[chip][ch][SCAtodraw]
 	   << "\t" << avg_LG[chip][ch][SCAtodraw] << endl;
+      //cout <<  chip*64+ch << "\t" << avg_HG[chip][ch][SCAtodraw]
+      //   << "\t" << avg_LG[chip][ch][SCAtodraw] << endl;
     }
   }
   file.close();
