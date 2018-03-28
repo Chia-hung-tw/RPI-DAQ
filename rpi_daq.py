@@ -94,7 +94,7 @@ class rpi_daq:
         dac_ctrl=0
         dac_fs=0xFFF
         if self.daq_options['acquisitionType']=="sweep":
-            stop_till_input = raw_input(">>> Stop till Input: ")
+            #stop_till_input = raw_input(">>> Stop till Input: ")
             #dac_ctrl = dac_value
             dac_ctrl = int(dac_fs * float(self.eventID) / float(self.daq_options['nEvent']))
             #print(dac_fs , " , " , self.eventID , " , " , self.daq_options['nEvent'])
