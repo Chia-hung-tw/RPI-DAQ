@@ -159,14 +159,17 @@ int format_channels(){
 int roll_position(){
   unsigned int roll_check;  //Just to check if 4 chip has same rollmask
   int chip,first,sec,rollpos;
+  bool skip_evt;
   for (chip =0; chip < 4; chip = chip +1 ){
     unsigned int roll;
     roll = ev[chip][1920] & 0x1FFF;
+    //printf("roll pos = %x\n",roll);
     if(chip == 0) roll_check = roll;
     else if( roll_check != roll ){
-      cout << "Problematic event!( No. " << evt_counter <<") Chip" << chip
+      cout << "Problematic event!( No. " << evt_counter <<") Chip " << chip
 	   << "has different rollMask! Skip event!" << endl;
-      return(-1);}
+      skip_evt = true;
+    }
 
     unsigned char bits[13];
     first = -1; // first is actually second XD
@@ -184,6 +187,7 @@ int roll_position(){
     //cout << first << " , " << sec << ", rollpos = " << rollpos << endl;
     //getchar();
    }
+  if(skip_evt){ return (-1); }
   return rollpos;
 }
 int init(){
@@ -218,7 +222,7 @@ int channel_sum(int rollpos){
 	dati_sumsq[chip][ch][hit] += dati[chip][ch][hit]*dati[chip][ch][hit];
       }
       if(MASKTS && check != EXPECTED_TS)
-	cout << "rollposition is wired! "<< check << " TS was saved!" << endl;
+	cout << "rollposition is weird! "<< check << " TS was saved!" << endl;
     }
   }
   return(0);
